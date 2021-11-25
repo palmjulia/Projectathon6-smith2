@@ -25,10 +25,10 @@ Es gibt zwei Möglichkeiten diese R-Skripte auszuführen: Direkt in R oder in ei
 Beim ersten Start des Skripts wird überprüft, ob die zur Ausführung notwendigen R-Pakete (`fhircrackr`, `data.table`) vorhanden sind. Ist dies nicht der Fall, werden diese Pakete nachinstalliert – dieser Prozess kann einige Zeit in Anspruch nehmen.
 
 ##### Batch-Datei/Shell-Skript
-**Unter Windows**: Mit der Batch-Datei `runDizKdsMonitor.bat`.
+**Unter Windows**: Mit der Batch-Datei `runSmith_select.bat`.
 Beim ersten Ausführen sollte diese ggf. als Administrator gestartet werden (über Eingabeaufforderung oder Rechtsklick), wenn die ggf. notwendigen Berechtigungen zum Nachinstallieren der R-Pakete sonst nicht vorhanden sind. Nach der ersten Installation reicht dann ein Doppelklick zum Starten.
 
-**Unter Linux**: Mit dem Shell-Skript `runDizKdsMonitor.sh`. Das Shell-Skript muss ausführbar sein und ggf. beim ersten Ausführen mittels `sudo` gestartet werden, wenn ein Nachinstallieren der R-Pakete außerhalb des User-Kontexts erforderlich ist.
+**Unter Linux**: Mit dem Shell-Skript `runSmith_selectr.sh`. Das Shell-Skript muss ausführbar sein und ggf. beim ersten Ausführen mittels `sudo` gestartet werden, wenn ein Nachinstallieren der R-Pakete außerhalb des User-Kontexts erforderlich ist.
 
 #### R/RStudio
 Durch Öffnen des R-Projektes (`SMITH_select.RProj`) mit anschließendem Ausführen der Datei `SMITH_select.R` innerhalb von R/RStudio. Auch hier werden beim ersten Ausführen ggf. notwendige R-Pakete nachinstalliert.
@@ -154,7 +154,6 @@ Extrahierte Elemente:
 - `Observation.valueQuantity.system`
 
 
-TBC
 
 ## Konzeptioneller Ablauf der Abfrage
 Prinzipiell geht das Skript wie folgt vor:

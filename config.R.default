@@ -3,7 +3,7 @@
 
 
 # FHIR-Endpunkt
-base <- "https://mii-agiop-3p.life.uni-leipzig.de/fhir" #"http://localhost:8080/fhir" ##
+base <- "https://mii-agiop-3p.life.uni-leipzig.de/fhir" 
 
 # SSL peer verification angeschaltet lassen?
 # TRUE = peer verification anschalten, FALSE = peer verification ausschalten 
@@ -16,14 +16,11 @@ filterConsent <- FALSE # wenn gefiltern werden muss: TRUE
 
 ### Authentifizierung
 
-# Bitte eine der drei Varianten wählen!
-authentication <- "None" # "None", "BasicAuth", "Token"
-
-# Falls Authentifizierung, bitte entsprechend anpassen:
+# Falls Authentifizierung, bitte entsprechend anpassen (sonst ignorieren):
 # Username und Passwort für Basic Authentification
-username <- ""
-password <- ""
+username <- NULL #zB "myusername"
+password <- NULL #zB "mypassword"
 
 # Alternativ: Token für Bearer Token Authentifizierung
-token <- ""
+token <- NULL #zB "mytoken"
 

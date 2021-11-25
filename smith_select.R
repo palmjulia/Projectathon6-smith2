@@ -16,6 +16,9 @@ if(file.exists("config.R")&&!dir.exists("config.R")){
   source("config.R.default")  
 }
 
+#If needed disable peer verification
+if(!ssl_verify_peer){httr::set_config(config(ssl_verifypeer = 0L))}
+
 #remove trailing slashes from endpoint
 base <- if(grepl("/$", base)){strtrim(base, width = nchar(base)-1)}else{base}
 
@@ -36,6 +39,9 @@ obs_request <- fhir_url(url = base,
 
 #download bundles
 obs_bundles <- fhir_search(request = obs_request,
+                           username = username,
+                           password = password,
+                           token = token,
                            log_errors = "errors/observation_error.xml")
 
 #save for checking purposes
@@ -99,7 +105,10 @@ if(filterConsent){
                             parameters = c(patient = ids))
 
     consent_bundles <- fhir_search(consent_request,
-                               log_errors = "errors/consent_error.xml")
+                                   username = username,
+                                   password = password,
+                                   token = token,
+                                   log_errors = "errors/consent_error.xml")
 
   })
   #bring consent results together, save and flatten
@@ -175,6 +184,9 @@ encounter_list <- lapply(list, function(x){
                                          "_profile" = "https://www.medizininformatik-initiative.de/fhir/core/modul-fall/StructureDefinition/KontaktGesundheitseinrichtung"))
 
   enc_bundles <- fhir_search(enc_request,
+                             username = username,
+                             password = password,
+                             token = token,
                              log_errors = "errors/encounter_error.xml")
 
 })
@@ -208,6 +220,9 @@ condition_list <- lapply(list, function(x){
                                          "_profile" = "https://www.medizininformatik-initiative.de/fhir/core/modul-diagnose/StructureDefinition/Diagnose"))
   
   con_bundles <- fhir_search(con_request,
+                             username = username,
+                             password = password,
+                             token = token,
                              log_errors = "errors/condition_error.xml")
   
 })

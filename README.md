@@ -1,5 +1,5 @@
 # Selectanfrage für den 6. Projectathon der MII: SMITH
-Datum: 24.11.21
+Datum: 25.11.21
 
 Autorin: [julia.palm@med.uni-jena.de](mailto:julia.palm@med.uni-jena.de).
 
@@ -31,7 +31,7 @@ Beim ersten Ausführen sollte diese ggf. als Administrator gestartet werden (üb
 **Unter Linux**: Mit dem Shell-Skript `runSmith_selectr.sh`. Das Shell-Skript muss ausführbar sein und ggf. beim ersten Ausführen mittels `sudo` gestartet werden, wenn ein Nachinstallieren der R-Pakete außerhalb des User-Kontexts erforderlich ist.
 
 #### R/RStudio
-Durch Öffnen des R-Projektes (`SMITH_select.RProj`) mit anschließendem Ausführen der Datei `SMITH_select.R` innerhalb von R/RStudio. Auch hier werden beim ersten Ausführen ggf. notwendige R-Pakete nachinstalliert.
+Durch Öffnen des R-Projektes (`Projectathon6-smith2.Rproj`) mit anschließendem Ausführen der Datei `smith_select.R` innerhalb von R/RStudio. Auch hier werden beim ersten Ausführen ggf. notwendige R-Pakete nachinstalliert.
 
 
 ## Ausführung im Docker Container
@@ -153,7 +153,60 @@ Extrahierte Elemente:
 - `Observation.valueQuantity.code`
 - `Observation.valueQuantity.system`
 
+### Modul Person: Patient
+Profil: `https://www.medizininformatik-initiative.de/fhir/core/modul-person/StructureDefinition/Patient`
 
+Version: [2.0.0-alpha3](https://simplifier.net/packages/de.medizininformatikinitiative.kerndatensatz.person/2.0.0-alpha3) bzw. [1.0.14](https://simplifier.net/packages/de.medizininformatikinitiative.kerndatensatz.person/1.0.14)
+
+Für Servabfrage verwendete Elemente:
+
+- keine
+
+Extrahierte Elemente:
+
+- `Patient.id`
+- `Patient.gender`
+- `Patient.birthDate`
+
+### Modul Fall: Encounter
+Profil: `https://www.medizininformatik-initiative.de/fhir/core/modul-fall/StructureDefinition/KontaktGesundheitseinrichtung`
+
+Version: [1.0.1](https://simplifier.net/packages/de.medizininformatikinitiative.kerndatensatz.fall/1.0.1)
+
+Für Servabfrage verwendete Elemente:
+
+- `Encounter.meta.profile`
+- `Encounter.subject.reference`
+
+Extrahierte Elemente:
+
+- `Encounter.subject.reference`
+- `Encounter.period.start `
+- `Encounter.period.end`
+- `Encounter.serviceType`
+
+### Modul Diagnose: Condition
+Profil: `https://www.medizininformatik-initiative.de/fhir/core/modul-diagnose/StructureDefinition/Diagnose`
+
+Version: [2.0.0-alpha3](https://simplifier.net/packages/de.medizininformatikinitiative.kerndatensatz.diagnose/2.0.0-alpha3) bzw. [1.0.4](https://simplifier.net/packages/de.medizininformatikinitiative.kerndatensatz.diagnose/1.0.4)
+
+Für Servabfrage verwendete Elemente:
+
+- `Condition.meta.profile`
+- `Condition.subject.reference`
+
+Extrahierte Elemente:
+
+- `Condition.clinicalStatus.coding.code`
+- `Condition.clinicalStatus.coding.system`
+- `Condition.verificationStatus.coding.code`
+- `Condition.verificationStatus.coding.system`
+- `Condition.code.coding.code`
+- `Condition.code.coding.system`
+- `Condition.subject.reference`
+- `Condition.onsetPeriod.start`
+- `Condition.onsetPeriod.end`
+- `Condition.recordedDate`
 
 ## Konzeptioneller Ablauf der Abfrage
 Prinzipiell geht das Skript wie folgt vor:

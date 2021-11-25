@@ -17,7 +17,7 @@ if(file.exists("config.R")&&!dir.exists("config.R")){
 }
 
 #If needed disable peer verification
-if(!ssl_verify_peer){httr::set_config(config(ssl_verifypeer = 0L))}
+if(!ssl_verify_peer){httr::set_config(httr::config(ssl_verifypeer = 0L))}
 
 #remove trailing slashes from endpoint
 base <- if(grepl("/$", base)){strtrim(base, width = nchar(base)-1)}else{base}

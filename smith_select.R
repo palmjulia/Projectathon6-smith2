@@ -89,21 +89,81 @@ while(any(nchar > nchar_for_ids)){
 
 #get consent
 if(filterConsent){
-  
+
   consent_list <- lapply(list, function(x){
-    
+
     ids <- paste(x, collapse = ",")
-    
+
     consent_request <- fhir_url(url = base,
                             resource = "Consent",
-                            parameters = c(subject = ids))
-    
+                            parameters = c(patient = ids))
+
     consent_bundles <- fhir_search(consent_request,
                                log_errors = "errors/consent_error.xml")
-    
+
   })
-}
+  #bring consent results together, save and flatten
+  consent_bundles <- fhircrackr:::fhir_bundle_list(unlist(consent_list, recursive = F))
+  fhir_save(bundles = consent_bundles, directory = "Bundles/Consents")
   
+  consent_description <- fhir_table_description("Consent",
+                                                cols = c(patient = "patient/reference",
+                                                         provision.code = "provision/provision/code/coding/code",
+                                                         provision.system = "provision/provision/code/coding/system"))
+  consent_table <- fhir_crack(consent_bundles, 
+                              design = consent_description,
+                              data.table = TRUE,
+                              brackets = brackets,
+                              sep = sep)
+  
+  #unpack multiple provision info
+  consent_table <- fhir_melt(consent_table,columns = c("provision.code", "provision.system"), brackets = brackets, sep = sep, all_columns = T)
+  consent_table <- fhir_melt(consent_table,columns = c("provision.code", "provision.system"), brackets = brackets, sep = sep, all_columns = T)
+  consent_table <- fhir_rm_indices(consent_table, brackets = brackets)
+  
+  #find Patients that have code for MDAT_wissenschaftlich_nutzen_EU_DSGVO_NIVEAU
+  allowed_pats <- consent_table[provision.code=="2.16.840.1.113883.3.1937.777.24.5.3.8" & provision.system=="urn:oid:2.16.840.1.113883.3.1937.777.24.5.3"]
+  allowed_pats <- sub("Patient/", "", allowed_pats$patient)
+  
+}
+
+###merge observation and patient data
+#prepare key variables for merge
+obs_tables$obs[, subject:=sub("Patient/", "", subject)] 
+
+#sort out col types
+obs_tables$obs[, NTproBNP.date := as.Date(NTproBNP.date)]
+
+#merge
+obsdata <- merge.data.table(x = obs_tables$obs, 
+                            y = obs_tables$pat, 
+                            by.x = "subject",
+                            by.y = "id",
+                            all.x = TRUE)
+
+
+#if necessary filter for consent and create new list of patient id chunks
+if(filterConsent){
+  obsdata <- obsdata[subject %in% allowed_pats]
+  
+  #split patient id list into smaller chunks that can be used in a GET url 
+  #(split because we don't want to exceed allowed URL length)
+  patients <- obsdata$subject #filtered patient ids
+  nchar_for_ids <- 1800 - nchar(paste0(base, "Encounter?_profile=https://www.medizininformatik-initiative.de/fhir/core/modul-fall/StructureDefinition/KontaktGesundheitseinrichtung")) #assume maximal length of 1800
+  
+  n <- length(patients)
+  list <- split(patients, ceiling(seq_along(patients)/n)) #split patients ids in chunks of size n
+  nchar <- sapply(list, function(x){sum(nchar(x))+(length(x)-1)}) #compute number of characters for each chunk, including commas for seperation
+  
+  #reduce the chunk size until number of characters is small enough
+  while(any(nchar > nchar_for_ids)){
+    n <- n/2
+    list <- split(patients, ceiling(seq_along(patients)/n))
+    nchar <- sapply(list, function(x){sum(nchar(x))+(length(x)-1)})
+  }
+  
+}
+
 #get encounters
 encounter_list <- lapply(list, function(x){
   
@@ -176,23 +236,15 @@ con_table <- fhir_crack(condition_bundles,
 
 
 
-###merge data
+###merge encounter data
 #prepare key variables for merge
-obs_tables$obs[, subject:=sub("Patient/", "", subject)] 
 enc_table[, subject:=sub("Patient/", "", subject)]
 
 #sort out col types
 enc_table[, encounter.start := as.Date(encounter.start)]
 enc_table[, encounter.end := as.Date(encounter.end)]
-obs_tables$obs[, NTproBNP.date := as.Date(NTproBNP.date)]
 
 #merge
-obsdata <- merge.data.table(x = obs_tables$obs, 
-                             y = obs_tables$pat, 
-                             by.x = "subject",
-                             by.y = "id",
-                             all.x = TRUE)
-
 cohort <-  merge.data.table(x = enc_table, 
                                    y = obsdata, 
                                    by.x = "subject",

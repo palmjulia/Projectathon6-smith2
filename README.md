@@ -216,6 +216,23 @@ Extrahierte Elemente:
 - `Condition.onsetPeriod.end`
 - `Condition.recordedDate`
 
+### Modul Consent: Consent
+Wird nur verwendet, wenn `filterConsent <- TRUE` in `config.R`, d.h. wenn konsentierte und nicht konsentierte Daten durch das R-Skript gefiltert werden müssen und die Trennung nicht durch unterschiedliche FHIR-Repositories erfolgt.
+
+Profil: `http://fhir.de/ConsentManagement/StructureDefinition/Consent`
+Version: [1.0.0](https://simplifier.net/packages/de.einwilligungsmanagement/1.0.0)
+Beispiel: https://simplifier.net/packages/de.einwilligungsmanagement/1.0.0/files/405292
+
+Für Servabfrage verwendete Elemente:
+
+- `Consent.patient.reference`
+
+Extrahierte Elemente:
+
+- `Consent.patient.reference`
+- `Consent.provision.provision.code.coding.code`
+- `Consent.provision.provision.code.coding.system`
+
 ## Konzeptioneller Ablauf der Abfrage
 Prinzipiell geht das Skript wie folgt vor:
 

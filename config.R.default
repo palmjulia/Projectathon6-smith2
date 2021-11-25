@@ -1,0 +1,29 @@
+# Konfigurations-Datei für Projectathon Select-Abfrage
+# Bitte die folgenden Variablen entsprechend der Gegebenheiten vor Ort anpassen!
+
+
+# FHIR-Endpunkt
+base <- "https://mii-agiop-3p.life.uni-leipzig.de/fhir" #"http://localhost:8080/fhir" ##
+
+# SSL peer verification angeschaltet lassen?
+# TRUE = peer verification anschalten, FALSE = peer verification ausschalten 
+ssl_verify_peer <- TRUE
+
+
+# Müssen die Ressourcen nach Consent gefiltert werden?
+# -> Liegen auf dem Server Daten von Patienten mit und ohne Consent gemischt?
+filterConsent <- FALSE # wenn gefiltern werden muss: TRUE
+
+### Authentifizierung
+
+# Bitte eine der drei Varianten wählen!
+authentication <- "None" # "None", "BasicAuth", "Token"
+
+# Falls Authentifizierung, bitte entsprechend anpassen:
+# Username und Passwort für Basic Authentification
+username <- ""
+password <- ""
+
+# Alternativ: Token für Bearer Token Authentifizierung
+token <- ""
+

@@ -26,12 +26,12 @@ base <- if(grepl("/$", base)){strtrim(base, width = nchar(base)-1)}else{base}
 brackets = c("[", "]")
 sep = " || "
 
-###Get all Observations between 2019-01-01 and 2021-12-31 with loinc 33763-4,71425-3,33762-6,83107-3 or 83108-1
-#also get associated patient resources
+###Get all Observations between 2019-01-01 and 2021-12-31 with loinc 33763-4,71425-3,33762-6,83107-3, 83108-1, 77622-9,77621-1
+#also get associated patient resources --> initial patient population
 #Observations have to implement MII profile
 obs_request <- fhir_url(url = base, 
                         resource = "Observation", 
-                        parameters = c("code" = "http://loinc.org|33763-4,http://loinc.org|71425-3,http://loinc.org|33762-6,http://loinc.org|83107-3,http://loinc.org|83108-1",
+                        parameters = c("code" = "http://loinc.org|33763-4,http://loinc.org|71425-3,http://loinc.org|33762-6,http://loinc.org|83107-3,http://loinc.org|83108-1,http://loinc.org|77622-9,http://loinc.org|77621-1",
                                        "date" = "ge2019-01-01",
                                        "date" = "le2021-12-31",
                                        "_include" = "Observation:patient",
@@ -74,12 +74,14 @@ if(nrow(obs_tables$pat)==0){
   stop("No Patients for NTproBNP Observations found - aborting.")
 }
 
-### get associated resources: consent, encounters, conditions
+### Prepare Patient id from initial patient population for Search requests that download associated resources (e.g. consent, encounters, conditions)
 
 #split patient id list into smaller chunks that can be used in a GET url 
 #(split because we don't want to exceed allowed URL length)
 patients <- obs_tables$pat$id #all patient ids
-nchar_for_ids <- 1800 - nchar(paste0(base, "Encounter?_profile=https://www.medizininformatik-initiative.de/fhir/core/modul-fall/StructureDefinition/KontaktGesundheitseinrichtung")) #assume maximal length of 1800
+nchar_for_ids <- 1800 - nchar(paste0(base, 
+                                     "Encounter?_profile=https://www.medizininformatik-initiative.de/fhir/core/modul-fall/StructureDefinition/KontaktGesundheitseinrichtung",
+                                     "_include=Encounter:diagnosis")) #assume maximal length of 1800
 
 n <- length(patients)
 list <- split(patients, ceiling(seq_along(patients)/n)) #split patients ids in chunks of size n
@@ -158,7 +160,9 @@ if(filterConsent){
   #split patient id list into smaller chunks that can be used in a GET url 
   #(split because we don't want to exceed allowed URL length)
   patients <- obsdata$subject #filtered patient ids
-  nchar_for_ids <- 1800 - nchar(paste0(base, "Encounter?_profile=https://www.medizininformatik-initiative.de/fhir/core/modul-fall/StructureDefinition/KontaktGesundheitseinrichtung")) #assume maximal length of 1800
+  nchar_for_ids <- 1800 - nchar(paste0(base, 
+                                       "Encounter?_profile=https://www.medizininformatik-initiative.de/fhir/core/modul-fall/StructureDefinition/KontaktGesundheitseinrichtung",
+                                       "_include=Encounter:diagnosis")) #assume maximal length of 1800
   
   n <- length(patients)
   list <- split(patients, ceiling(seq_along(patients)/n)) #split patients ids in chunks of size n
@@ -173,7 +177,9 @@ if(filterConsent){
   
 }
 
-#get encounters
+#get encounters and diagnoses 
+# --> all encounters of initial (possibly filtered for consent) patient population, 
+#has be filtered to only include encounters with NTproBNP Observation later on 
 encounter_list <- lapply(list, function(x){
   
   ids <- paste(x, collapse = ",")
@@ -181,7 +187,9 @@ encounter_list <- lapply(list, function(x){
   enc_request <- fhir_url(url = base,
                           resource = "Encounter",
                           parameters = c(subject = ids,
-                                         "_profile" = "https://www.medizininformatik-initiative.de/fhir/core/modul-fall/StructureDefinition/KontaktGesundheitseinrichtung"))
+                                         "_include" = "Encounter:diagnosis",
+                                         "_profile" = "https://www.medizininformatik-initiative.de/fhir/core/modul-fall/StructureDefinition/KontaktGesundheitseinrichtung")
+                          )
 
   enc_bundles <- fhir_search(enc_request,
                              username = username,
@@ -196,83 +204,52 @@ encounter_bundles <- fhircrackr:::fhir_bundle_list(unlist(encounter_list, recurs
 fhir_save(bundles = encounter_bundles, directory = "Bundles/Encounters")
 
 enc_description <- fhir_table_description("Encounter",
-                                          cols = c(subject = "subject/reference",
+                                          cols = c(encounter.id = "id",
+                                                   subject = "subject/reference",
                                                    encounter.start = "period/start", 
                                                    encounter.end = "period/end",
+                                                   diagnosis = "diagnosis/condition/reference",
+                                                   diagnosis.use.code = "diagnosis/use/coding/code",
+                                                   diagnosis.use.system = "diagnosis/use/coding/system",
                                                    serviceType = "serviceType"))
-enc_table <- fhir_crack(encounter_bundles, 
-                        design = enc_description,
-                        data.table = TRUE)
-if(nrow(enc_table)==0){
-  write("Konnte keine Encounter-Ressourcen zu den gefundenen Patients finden. Abfrage abgebrochen.", file ="errors/error_message.txt")
-  stop("No Encounters for Patients found - aborting.")
-} 
-
-
-#get conditions
-condition_list <- lapply(list, function(x){
-  
-  ids <- paste(x, collapse = ",")
-
-  con_request <- fhir_url(url = base,
-                          resource = "Condition",
-                          parameters = c(subject = ids,
-                                         "_profile" = "https://www.medizininformatik-initiative.de/fhir/core/modul-diagnose/StructureDefinition/Diagnose"))
-  
-  con_bundles <- fhir_search(con_request,
-                             username = username,
-                             password = password,
-                             token = token,
-                             log_errors = "errors/condition_error.xml")
-  
-})
-
-#bring together conditions, save and flatten
-condition_bundles <- fhircrackr:::fhir_bundle_list(unlist(condition_list, recursive = F))
-fhir_save(bundles = condition_bundles, directory = "Bundles/Conditions")
 
 con_description <- fhir_table_description("Condition",
-                                          cols = c(clinicalStatus.code = "clinicalStatus/coding/code",
+                                          cols = c(condition.id = "id",
+                                                   clinicalStatus.code = "clinicalStatus/coding/code",
                                                    clinicalStatus.system = "clinicalStatus/coding/system",
                                                    verificationStatus.code = "verificationStatus/coding/code",
                                                    verificationStatus.system = "verificationStatus/coding/system",
                                                    code = "code/coding/code",
                                                    code.system = "code/coding/system",
-                                                   subject = "subject/reference",
-                                                   onsetPeriod.start = "onsetPeriod/start",
-                                                   onsetPeriod.end = "onsetPeriod/end",
-                                                   recordedDate = "recordedDate"))
+                                                   subject = "subject/reference"))
 
-con_table <- fhir_crack(condition_bundles, 
-                        design = con_description,
-                        data.table = TRUE,
+enc_tables <- fhir_crack(encounter_bundles, 
+                        design = fhir_design(encounters = enc_description, conditions = con_description),
                         brackets = brackets,
-                        sep = sep)
+                        sep = sep,
+                        data.table = TRUE)
+
+if(nrow(enc_tables$encounters)==0){
+  write("Konnte keine Encounter-Ressourcen zu den gefundenen Patients finden. Abfrage abgebrochen.", file ="errors/error_message.txt")
+  stop("No Encounters for Patients found - aborting.")
+} 
 
 
+encounters <- enc_tables$encounters
+conditions <- enc_tables$conditions
 
-###merge encounter data
-#prepare key variables for merge
-enc_table[, subject:=sub("Patient/", "", subject)]
+###generate conditions table --> has all conditions of all Encounters of the initial Patient population
+if(!all(is.na(encounters$diagnosis))){
+  
+  #extract diagnosis use info from encounter table 
+  useInfo <- fhir_melt(encounters, columns = c("diagnosis", "diagnosis.use.code", "diagnosis.use.system"), 
+                       brackets = brackets, sep = sep, all_columns = T)
+  useInfo <- fhir_rm_indices(useInfo, brackets = brackets)
+  useInfo <- useInfo[,c("encounter.id", "diagnosis", "diagnosis.use.code", "diagnosis.use.system")]
+  useInfo[,diagnosis := sub("Condition/", "", diagnosis)]
 
-#sort out col types
-enc_table[, encounter.start := as.Date(encounter.start)]
-enc_table[, encounter.end := as.Date(encounter.end)]
-
-#merge
-cohort <-  merge.data.table(x = enc_table, 
-                                   y = obsdata, 
-                                   by.x = "subject",
-                                   by.y = "subject",
-                                   all.x = TRUE)
-
-#filter encounters that dont belong to the NTproBNP observation
-cohort <- cohort[NTproBNP.date >= encounter.start & NTproBNP.date <= encounter.end]
-
-if(nrow(con_table) > 0){
-  #filter conditions
-  #expand codes
-  conditions <- fhir_melt(con_table, columns = c("code", "code.system"), brackets = brackets, sep = sep, all_columns = TRUE)
+  #expand condition codes
+  conditions <- fhir_melt(conditions, columns = c("code", "code.system"), brackets = brackets, sep = sep, all_columns = TRUE)
   conditions <- fhir_melt(conditions, columns = c("code", "code.system"), brackets = brackets, sep = sep, all_columns = TRUE)
   conditions <- fhir_rm_indices(conditions, brackets = brackets)
   conditions[,resource_identifier:=NULL]
@@ -280,20 +257,43 @@ if(nrow(con_table) > 0){
   #filter for ICD codesystem
   conditions <- conditions[grepl("icd-10", code.system)]
   
-  #codes for selection
-  condition_codes <- c("I48.0", "I48.1", "I48.2", "I48.9", "I50.00", "I50.01", "I50.02",
-                       "I50.03", "I50.04", "I50.05", "I50.1", "I50.11", "I50.12", "I50.13",
-                       "I50.14", "I50.19", "I50.9", "I13.21", "I13.20", "I13.3", "I13.01", "I13.00")
-  
-  #filter for specific codes
-  conditions <- conditions[code %in% condition_codes]
+  #add diagnosis use info to condition table
+  conditions <- merge.data.table(x = conditions, 
+                                 y = useInfo,
+                                 by.x = "condition.id",
+                                 by.y = "diagnosis",
+                                 all.x = TRUE)
   
   #prepare key variable
   conditions[, subject:=sub("Patient/", "", subject)]
-}else{
-  conditions <- con_table
 }
 
+
+
+###prepare encounter table
+#remove diagnosis info and indices
+encounters[,c("diagnosis", "diagnosis.use.code", "diagnosis.use.system"):=NULL]
+encounters <- fhir_rm_indices(encounters, brackets = brackets)
+
+#prepare key variable for merge
+encounters[, subject:=sub("Patient/", "", subject)]
+
+#sort out col types
+encounters[, encounter.start := as.Date(encounter.start)]
+encounters[, encounter.end := as.Date(encounter.end)]
+
+#merge
+cohort <-  merge.data.table(x = encounters, 
+                            y = obsdata, 
+                            by.x = "subject",
+                            by.y = "subject",
+                            all.x = TRUE)
+
+#remove encounters that don't have a NTproBNP observation within their encounter.period
+cohort <- cohort[NTproBNP.date >= encounter.start & NTproBNP.date <= encounter.end]
+
+#filter conditions: only keep conditions belonging to the encounter we have just filtered
+conditions <- conditions[encounter.id %in% cohort$encounter.id]
 
 ###Export
 if(!dir.exists("Ergebnisse")){dir.create("Ergebnisse")}

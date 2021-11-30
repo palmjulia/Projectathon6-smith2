@@ -121,6 +121,7 @@ Diese Tabelle enthält alle Diagnosen der Patienten aus Kohorte.csv, die einen d
 
 |Variable             | Bedeutung|
 |---------------------|----------|
+|condition.id               |Ressourcen ID der Condition Ressource|
 |clinicalStatus.code        |Code des ClinicalStatus|
 |clinicalStatus.system      |Codesystem des ClinicalStatus|
 |verificationStatus.code    |Code des verificationStatus|
@@ -128,9 +129,11 @@ Diese Tabelle enthält alle Diagnosen der Patienten aus Kohorte.csv, die einen d
 |code                       |ICD-Code|
 |code.system                |Codesystem des ICD Codes|
 |subject                    |ID der zugehörigen Patient Ressource|
-|onsetPeriod.start          |Onset Start|
-|onsetPeriod.end            |Onset End|
-|recordedDate               |recordedDate|
+|encounter.id               |ID der zugehörigen Encounter Ressource|
+|diagnosis.use.code         |Encounter.diagnosis.use.coding.code mit dem die Condition im zugehörigen Encounter beschrieben ist|
+|diagnosis.use.system         |Encounter.diagnosis.use.coding.system mit dem die Condition im zugehörigen Encounter beschrieben ist|
+
+
 
 ### Bundles
 Dieser Ordner enthält die heruntergeladenen Bundles und kann der Kontrolle dienen, falls die Tabellen nicht aussehen wie erwartet.
@@ -142,7 +145,6 @@ Dieser Ordner enthält ggf. Fehlermeldungen, wenn die Abfrage nicht erfolgreich 
 Das Skript verwendet folgende Codesysteme:
 
 - *http://loinc.org* für `Observation.code.coding.system` -> Dieses System wird für den Download per FHIR Search verwendet
-- *xxxxxxicd-10xxxxx* für `Condition.code.coding.system` -> Im Skript wird per String matching nach irgendeinem CodeSystem gesucht, das die Zeichen *icd-10* enthält (Für Kompatibilität bei Änderungen des konkreten ICD-Systems)
 - *urn:oid:2.16.840.1.113883.3.1937.777.24.5.3* für `Consent.provision.provision.code.coding.system` -> Nur verwendet, wenn konsentierte Daten über Consent Ressource selektiert werden, also wenn `filterConsent <- TRUE` in config.R.
 
 ## Verwendete Profile/Datenelemente
@@ -199,6 +201,8 @@ Extrahierte Elemente:
 - `Encounter.period.start `
 - `Encounter.period.end`
 - `Encounter.serviceType`
+- `Encounter.diagnosis.use.coding.code`
+- `Encounter.diagnosis.use.coding.system`
 
 ### Modul Diagnose: Condition
 Profil: `https://www.medizininformatik-initiative.de/fhir/core/modul-diagnose/StructureDefinition/Diagnose`
@@ -219,9 +223,7 @@ Extrahierte Elemente:
 - `Condition.code.coding.code`
 - `Condition.code.coding.system`
 - `Condition.subject.reference`
-- `Condition.onsetPeriod.start`
-- `Condition.onsetPeriod.end`
-- `Condition.recordedDate`
+
 
 ### Modul Consent: Consent
 Wird nur verwendet, wenn `filterConsent <- TRUE` in `config.R`, d.h. wenn konsentierte und nicht konsentierte Daten durch das R-Skript gefiltert werden müssen und die Trennung nicht durch unterschiedliche FHIR-Repositories erfolgt.
@@ -243,21 +245,21 @@ Extrahierte Elemente:
 ## Konzeptioneller Ablauf der Abfrage
 Prinzipiell geht das Skript wie folgt vor:
 
-1) Lade alle Observations, die eine NTproBNP-Messung darstellen (`loinc code` ist einer aus: `33763-4,71425-3,33762-6,83107-3, 83108-1`), welche ein `effective` im Zeitraum `2019-01-01 - 2021-12-31` haben und das Profil `https://www.medizininformatik-initiative.de/fhir/core/modul-labor/StructureDefinition/ObservationLab` erfüllen, herunter. Ziehe dazu außerdem (mit `_include`) die zugehörigen Patient Ressourcen.
+1) Lade alle Observations, die eine NTproBNP-Messung darstellen (`loinc code` ist einer aus: `33763-4,71425-3,33762-6,83107-3, 83108-1,77622-9,77621-1`), welche ein `effective` im Zeitraum `2019-01-01 - 2021-12-31` haben und das Profil `https://www.medizininformatik-initiative.de/fhir/core/modul-labor/StructureDefinition/ObservationLab` erfüllen, herunter. Ziehe dazu außerdem (mit `_include`) die zugehörigen Patient Ressourcen.
 
-Request: `"[base]/Observation?code=http://loinc.org%7C33763-4,http://loinc.org%7C71425-3,http://loinc.org%7C33762-6,http://loinc.org%7C83107-3,http://loinc.org%7C83108-1&date=ge2019-01-01&date=le2021-12-31&_include=Observation:patient&_profile=https://www.medizininformatik-initiative.de/fhir/core/modul-labor/StructureDefinition/ObservationLab"`
+Request: `[base]/Observation?_include=Observation%3Apatient&_profile=https%3A%2F%2Fwww.medizininformatik-initiative.de%2Ffhir%2Fcore%2Fmodul-labor%2FStructureDefinition%2FObservationLab&code=http%3A%2F%2Floinc.org%7C33763-4%2Chttp%3A%2F%2Floinc.org%7C71425-3%2Chttp%3A%2F%2Floinc.org%7C33762-6%2Chttp%3A%2F%2Floinc.org%7C83107-3%2Chttp%3A%2F%2Floinc.org%7C83108-1%2Chttp%3A%2F%2Floinc.org%7C77622-9%2Chttp%3A%2F%2Floinc.org%7C77621-1&date=ge2019-01-01&date=le2021-12-31`
 
-2) Extrahiere die IDs der Patient Ressourcen und verwende sie um alle zugehörigen Encounter herunterzuladen. Dafür werden die Abfragen soweit gesplittet, dass der jeweilige GET-Request eine Länge von 1800 Zeichen nicht überschreitet.(Mir ist klar, das POST eleganter ist, aber wir versuchen die Anforderungen an den Server/Rechte möglichst niedrig zu halten.) Die Encounter müssen das Profil KontaktGesundheitseinrichtung der MII implementieren. 
+1a) Optional: Lade die zu den Patienten gehörigen Consents herunter und filtere die bisher geladenen Daten, sodass nur Daten von Patienten mit Consent übrig bleiben. 
 
-Request (beispielhaft für Patient ids `xxx` und `yyy`): `[base]/Encounter?_profile=https%3A%2F%2Fwww.medizininformatik-initiative.de%2Ffhir%2Fcore%2Fmodul-fall%2FStructureDefinition%2FKontaktGesundheitseinrichtung&subject=xxx%2Cyyy`
+Request (beispielhaft für Patient ids `xxx` und `yyy`): `[base]/Consent?patient=xxx%2Cyyy`
+
+2) Extrahiere die IDs der Patient Ressourcen und verwende sie um alle zugehörigen Encounter und die darin verlinkten Condition-Ressourcen herunterzuladen. Dafür werden die Abfragen soweit gesplittet, dass der jeweilige GET-Request eine Länge von 1800 Zeichen nicht überschreitet.(Mir ist klar, das POST eleganter ist, aber wir versuchen die Anforderungen an den Server/Rechte möglichst niedrig zu halten.) Die Encounter müssen das Profil KontaktGesundheitseinrichtung der MII implementieren. 
+
+Request (beispielhaft für Patient ids `xxx` und `yyy`): `[base]/Encounter?_include=Encounter%3Adiagnosis&_profile=https%3A%2F%2Fwww.medizininformatik-initiative.de%2Ffhir%2Fcore%2Fmodul-fall%2FStructureDefinition%2FKontaktGesundheitseinrichtung&subject=xxx%2Cyyy`
 
 3) Filtere die Encounter, sodass nur die Encounter übrig bleiben, in deren `period` eine NTproBNP Observation liegt.
 
-4) Lade nach dem gleichen Prinzip wie in 2) alle Condition Ressourcen herunter, die auf die in 1) selektierten Patienten verweisen. Die Conditions müssen das Profil Diagnose der MII implementieren. 
+4) Filtere die Diagnosen, sodass nur Diagnosen übrig bleiben, die zu den Encountern aus 3) gehören.
 
-Request (beispielhaft für Patient ids `xxx` und `yyy`):
-`[base]/Condition?_profile=https%3A%2F%2Fwww.medizininformatik-initiative.de%2Ffhir%2Fcore%2Fmodul-diagnose%2FStructureDefinition%2FDiagnose&subject=xxx%2Cyyy`
-
-5) Filtere die Diagnosen so, dass nur noch Diagnosen enthalten sind, die einen der im Antrag genannten ICD-Codes enthalten.
 
 
